@@ -34,10 +34,10 @@ var getMongoUrlForService = function(mongoServiceName) {
     if(mongoService !== undefined){
         mongoCredentials = services[mongoServiceName].credentials;
         mongoUrl = mongoCredentials.uri;
+        
+        console.log("'" + mongoServiceName + "' found in VCAP_SERVICES ! ");
+        console.log("Url for mongodb : '" + mongoUrl + "'");        
     }
-
-    console.log("'" + mongoServiceName + "' found in VCAP_SERVICES ! ");
-    console.log("Url for mongodb : '" + mongoUrl + "'");
 
     return mongoUrl;
 }
