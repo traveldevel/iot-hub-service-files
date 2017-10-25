@@ -7,6 +7,7 @@ var multer  = require('multer');
 var Grid = require('gridfs-stream');
 var fs = require('fs');
 const cfenv = require("cfenv");
+const basicAuth = require('basic-auth');
 
 var mongoose = require('mongoose');
 var Schema = mongoose.Schema;
@@ -22,6 +23,33 @@ if(!appEnv.isLocal){
 }
 
 const port = process.env.PORT || 8080;
+const authorizedUsers = process.env.BASIC_AUTH_USERS.split(',');
+const authorizedUserPasswords = process.env.BASIC_AUTH_USER_PASSWORDS.split(',');
+
+// auth global function
+const auth = function (req, res, next) {
+    
+    if(req.method === "OPTIONS"){
+        return next();
+    }
+
+    function unauthorized(res) {
+        res.set('WWW-Authenticate', 'Basic realm=Authorization Required');
+        return res.sendStatus(401);
+    };
+
+    var user = basicAuth(req);
+
+    if (!user || !user.name || !user.pass) {
+        return unauthorized(res);
+    };
+
+    if (authorizedUsers.indexOf(user.name) >= 0 && authorizedUserPasswords.indexOf(user.pass) >= 0) {
+        return next();
+    } else {
+        return unauthorized(res);
+    };
+};
 
 // get mongo url from service function
 var getMongoUrlForService = function(mongoServiceName) {
@@ -55,15 +83,27 @@ if(mongoUrlFiles.length === 0){
 
 // create or use an existing mongodb-native db instance.
 // for this example we'll just create one:
-var db = new mongodb.Db(mongoUrlFiless);
+// var db = new mongodb.Db(mongoUrlFiles);
 
-// make sure the db instance is open before passing into `Grid`
-db.open(function (err) {
-  if (err) return handleError(err);
-  var gfs = Grid(db, mongodb);
+// // make sure the db instance is open before passing into `Grid`
+// db.open(function (err) {
+//   if (err) return handleError(err);
+//   var gfs = Grid(db, mongodb);
 
-  // all set!
-})
+//   // all set!
+// })
+
+var MongoClient = require('mongodb').MongoClient;
+
+MongoClient.connect(mongoUrlFiles, function(err, db) {
+    
+    if (err) return handleError(err);
+
+    console.log("Connected correctly to server");
+
+    db.close();
+});
+
 
 var app = express();
 
@@ -71,7 +111,7 @@ app.use('/uploads', express.static(__dirname + '/uploads'));
 app.use(multer({ dest: './uploads/' }).any());
 
 // file info
-app.get('/file/info/:id',function(req, res){
+app.get('/file/info/:id', auth, function(req, res){
     
     var file_id = req.param('id');
 
@@ -85,7 +125,7 @@ app.get('/file/info/:id',function(req, res){
 });
 
 // file delete
-app.get('/file/delete/:id',function(req, res){
+app.get('/file/delete/:id', auth, function(req, res){
     
     var file_id = req.param('id');
 
@@ -97,7 +137,7 @@ app.get('/file/delete/:id',function(req, res){
 
 
 //file download
-app.get('/file/download/:id',function(req, res){
+app.get('/file/download/:id', auth, function(req, res){
 
     var file_id = req.param('id');
     var gfs = req.gfs;
@@ -121,7 +161,7 @@ app.get('/file/download/:id',function(req, res){
 });
 
 // file upload
-app.all('/file/upload',function(req,res){
+app.all('/file/upload', auth, function(req, res){
 
     var dirname = require('path').dirname(__dirname);
     var filename = req.files.file.name;
@@ -141,6 +181,18 @@ app.all('/file/upload',function(req,res){
     writestream.on('close', function () {
         gfs.unlinkSync(completeName); 
     });
+});
+
+app.get('/', auth, function(req, res){
+
+    res.writeHead(200, {'Content-Type': 'text/html'});
+    
+    res.write('<form action="fileupload" method="post" enctype="multipart/form-data">');
+    res.write('<input type="file" name="filetoupload"><br>');
+    res.write('<input type="submit">');
+    res.write('</form>');
+    
+    return res.end();
 });
 
 // app listen
