@@ -56,7 +56,9 @@ var getMongoUrlForService = function(mongoServiceName) {
     var mongoService = services[mongoServiceName];
 
     var mongoCredentials = {};
+    
     var mongoUrl = '';
+    var mongoDbName = '';
 
     if(mongoService !== undefined){
         mongoCredentials = services[mongoServiceName].credentials;
@@ -71,7 +73,7 @@ var getMongoUrlForService = function(mongoServiceName) {
         console.log("DB for mongodb : '" + mongoDbName + "'");  
     }
 
-    return mongoUrl;
+    return { "url" : mongoUrl, "db" : mongoDbName};
 }
 
 const landscapeName = process.env.LANDSCAPE_NAME;
