@@ -103,11 +103,32 @@ var app = express();
 app.use('/uploads', express.static(__dirname + '/uploads'));
 app.use(multer({ dest: './uploads/' }).any());
 
+// files list for device
+app.get('/file/list/:device_id', auth, function(req, res){
+    
+    var device_id = req.params.device_id;
+    console.log("Files for device_id : ", device_id);
+
+    MongoClient.connect(mongoUrl, function(err, db) {
+        
+        if(err){
+            console.log(err);
+        }
+    
+        var gfs = Grid(db, mongodb);
+
+        db.collection("file").find({ device_id: device_id }).toArray(function (err, mfiles) {
+            //console.log(mfiles);
+            res.status(200).json(mfiles);
+        });
+    });
+});
+
 // file info
 app.get('/file/info/:id', auth, function(req, res){
     
     var file_id = new ObjectID(req.params.id);
-    console.log("Deletion of file_id : ", file_id);
+    console.log("Info for file_id : ", file_id);
 
     MongoClient.connect(mongoUrl, function(err, db) {
         
