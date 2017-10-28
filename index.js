@@ -106,14 +106,27 @@ app.use(multer({ dest: './uploads/' }).any());
 // file info
 app.get('/file/info/:id', auth, function(req, res){
     
-    var file_id = req.params.id;
+    var file_id = new ObjectID(req.params.id);
+    console.log("Deletion of file_id : ", file_id);
 
-    gfs.files.find({ _id : file_id }).toArray(function (err, files) {
+    MongoClient.connect(mongoUrl, function(err, db) {
         
-        if (err) return res.status(400).send(err);
-        if (!files) return res.status(404).send('');
-        
-        console.log(files);
+        if(err){
+            console.log(err);
+        }
+    
+        var gfs = Grid(db, mongodb);
+
+        db.collection("file").find({ _id: file_id }).toArray(function (err, mfiles) {
+
+            //console.log(mfiles);
+
+            if(mfiles.length === 0){
+                return res.status(404).send('File Not Found');
+            }
+
+            res.status(200).json(mfiles[0]);
+        });
     });
 });
 
