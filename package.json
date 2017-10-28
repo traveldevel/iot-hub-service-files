@@ -4,7 +4,7 @@
   "description": "File store in MongoDb REST service",
   "main": "index.js",
   "engines": {
-    "node": "8.7.0"
+    "node": "8.8.0"
   },
   "scripts": {
     "start": "node ./index.js",
