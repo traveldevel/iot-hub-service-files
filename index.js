@@ -9,9 +9,7 @@ var fs = require('fs');
 const cfenv = require("cfenv");
 const basicAuth = require('basic-auth');
 var MongoClient = require('mongodb').MongoClient;
-
-var mongoose = require('mongoose');
-var Schema = mongoose.Schema;
+var ObjectID = require('mongodb').ObjectID;
 
 // configs from env vars
 var appEnv = cfenv.getAppEnv();
@@ -108,7 +106,7 @@ app.use(multer({ dest: './uploads/' }).any());
 // file info
 app.get('/file/info/:id', auth, function(req, res){
     
-    var file_id = req.param('id');
+    var file_id = req.params.id;
 
     gfs.files.find({ _id : file_id }).toArray(function (err, files) {
         
@@ -122,7 +120,7 @@ app.get('/file/info/:id', auth, function(req, res){
 // file delete
 app.get('/file/delete/:id', auth, function(req, res){
     
-    var file_id = req.param('id');
+    var file_id = req.params.id;
 
     gfs.remove({ _id : file_id }, function (err, gridStore) {
         if (err) return handleError(err);
@@ -133,24 +131,48 @@ app.get('/file/delete/:id', auth, function(req, res){
 //file download
 app.get('/file/download/:id', auth, function(req, res){
 
-    var file_id = req.param('id');
-    var gfs = req.gfs;
+    var file_id = new ObjectID(req.params.id);
+    console.log("Requested file_id : ", file_id);
 
-    gfs.files.find({ _id : file_id }).toArray(function (err, files) {
-
-        if (err) return res.status(400).send(err);
-        if (!files) return res.status(404).send('');
+    MongoClient.connect(mongoUrl, function(err, db) {
         
-        if (files.length > 0) {
-            var mime = 'image/jpeg';
-            res.set('Content-Type', mime);
-            var read_stream = gfs.createReadStream({filename: file_id});
-            read_stream.pipe(res);
-        } 
-        else 
-        {
-            res.json('File Not Found');
+        if(err){
+            console.log(err);
         }
+    
+        var gfs = Grid(db, mongodb);
+
+        db.collection("file").find({ _id: file_id }).toArray(function (err, mfiles) {
+
+            console.log(mfiles);
+
+            if(mfiles.length === 0){
+                return res.status(404).send('File Not Found');
+            }
+
+            var gfs_id = mfiles[0].gfs_id;
+
+            gfs.files.find({ _id: gfs_id }).toArray(function (err, files) {
+                
+                if (err) return res.status(400).send(err);
+                if (!files) return res.status(404).send('');
+                
+                if (files.length > 0) {
+    
+                    console.log(files[0]);
+    
+                    var mime = files[0].contentType;
+                    res.set('Content-Type', mime);
+
+                    var read_stream = gfs.createReadStream({ _id: gfs_id });
+                    read_stream.pipe(res);
+                } 
+                else 
+                {
+                    res.json('File Not Found');
+                }
+            });            
+        });
     });
 });
 
@@ -197,7 +219,8 @@ app.all('/file/upload/:device_id', auth, function(req, res){
                 content_type: data.contentType,
                 md5: data.md5,
                 created_at: data.uploadDate,
-                size: data.length
+                size: data.length,
+                filename: originalname
             };
 
             db.collection("file").insertOne(newFile, function(err, result) {
